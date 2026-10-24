@@ -30,9 +30,17 @@ Optional props (docs): colors={["#ffffff", "#ffe629"]} tints the light white-to-
 to match this black/white/yellow theme. Default edge colour is purple.
 Never upload .env.local to GitHub. Vercel does not need the key.
 
-## Where data is stored
-Collections, categories, items (and saved logins) are in this browser's
-localStorage under the key "keepsake.v1". Passwords are NOT encrypted:
-anyone who can open this browser profile, or any browser extension or malware
-that can read the site's storage, can read them. Hiding is only visual.
-Data does not sync between devices and is lost if you clear site data.
+## How the app works
+Home: your own categories. Open one: your own sub-categories. Open one: a numbered
+list (1, 2, 3) with + Add. Click a heading to see the big page with Copy buttons.
+Bottom of Home: Private lock (encrypted area with its own categories).
+
+## Where data is stored (this browser only)
+- Normal data: localStorage key "keepsake.v2". NOT encrypted. Old "keepsake.v1" data is left untouched.
+- Private lock: localStorage key "keepsake.vault.v1". Encrypted with AES-GCM.
+  A random key encrypts the data. That key is saved twice: locked by your password
+  and locked by your Recovery code (shown once). Either opens the lock.
+- If you lose BOTH the password and the Recovery code, nobody can open the lock.
+- The lock closes by itself when you leave the Private lock pages.
+- Passwords in normal items are not encrypted. Use the Private lock for important secrets.
+- Data does not sync between devices and is lost if you clear site data.
