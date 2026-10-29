@@ -5,9 +5,10 @@ import BlackHole from "@/components/BlackHoleFallback";
 import NameList from "./NameList.jsx";
 import Lock from "./Lock.jsx";
 
-export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock }) {
+export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, onExport, notice }) {
   return (
     <>
+      {notice}
       <section className="hero">
         <div className="hero-bg"><BlackHole /></div>
         <div className="hero-in">
@@ -18,7 +19,10 @@ export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock }) 
       </section>
       <NameList rows={rows} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} placeholder="Search categories…" empty="No categories yet. Press “+ Add category” to make your first one." />
       <div className="foot">
-        <button className="btn" onClick={onLock}><Lock /> Private lock</button>
+        <div className="row" style={{ justifyContent: "center", gap: 12 }}>
+          <button className="btn" onClick={onExport}>Export PDF</button>
+          <button className="btn" onClick={onLock}><Lock /> Private lock</button>
+        </div>
       </div>
     </>
   );

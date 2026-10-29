@@ -12,8 +12,7 @@ export default function VaultGate({ V, onBack, notify }) {
   const run = async (fn) => { setBusy(true); setErr(""); try { const m = await fn(); if (m) setErr(m); } finally { setBusy(false); } };
   const checkNew = () => (pw.length < 4 ? "Use at least 4 characters." : pw !== pw2 ? "The two passwords are not the same." : "");
 
-  if (V.status === "broken") return (<><Head title="Private lock" onBack={onBack} /><div className="banner" role="alert">The saved lock data cannot be read. Nothing was deleted. Please tell your helper.</div></>);
-  if (V.status === "blocked") return (<><Head title="Private lock" onBack={onBack} /><div className="banner" role="alert">This browser blocks storage, so the lock cannot be used here.</div></>);
+  if (V.status === "error") return (<><Head title="Private lock" onBack={onBack} /><div className="banner" role="alert">The lock could not be loaded. Check the internet and the database rules. Nothing was deleted.</div></>);
 
   return (
     <>

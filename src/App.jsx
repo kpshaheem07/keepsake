@@ -7,51 +7,72 @@ import Detail from "@/components/Detail.jsx";
 import FormDialog from "@/components/FormDialog.jsx";
 import NameDialog from "@/components/NameDialog.jsx";
 import VaultGate from "@/components/VaultGate.jsx";
-import { loadState, saveState } from "@/storage";
+import ExportDialog from "@/components/ExportDialog.jsx";
+import PrintView from "@/components/PrintView.jsx";
+import { signOut } from "firebase/auth";
+import { terminate, clearIndexedDbPersistence } from "firebase/firestore";
+import { auth, db } from "@/firebase";
+import { useCloud } from "@/useCloud";
 import { useVault } from "@/useVault";
 import { useRoute, go } from "@/lib/hash";
-import { uid, copyText } from "@/lib/utils";
+import { uid, copyText, byCreated } from "@/lib/utils";
 import { ITEM_FIELDS, VAULT_FIELDS } from "@/fields";
 
 const now = () => new Date().toISOString();
 const mk = (name) => ({ id: uid(), name, created: now(), updated: now() });
-const byCreated = (a, b) => a.created.localeCompare(b.created);
 
-export default function App() {
-  const init = useRef(null);
-  if (!init.current) init.current = loadState();
-  const [S, setS] = useState(init.current.state);
-  const [warn] = useState(init.current.warning);
-  const [saveErr, setSaveErr] = useState("");
+function readLocal(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+
+export default function App({ user }) {
+  const me = user.uid;
+  const [vErr, setVErr] = useState("");
   const [toast, setToast] = useState("");
   const [dlg, setDlg] = useState(null);
+  const [exp, setExp] = useState(null);
+  const [job, setJob] = useState(null);
+  const [migrated, setMigrated] = useState(() => !!localStorage.getItem("keepsake.migrated"));
+  const [localData] = useState(() => { const d = readLocal("keepsake.v2"); return d && Array.isArray(d.cats) && d.cats.length ? d : null; });
   const timer = useRef();
   const r = useRoute();
-  const V = useVault();
+  const C = useCloud(me);
+  const V = useVault(me, setVErr);
+  const S = C.S;
+  const saveErr = C.error || vErr;
 
   const notify = (m) => { setToast(m); clearTimeout(timer.current); timer.current = setTimeout(() => setToast(""), 1800); };
   const copy = async (t, label) => notify((await copyText(t)) ? `${label} copied` : "Copy failed — select the text and copy by hand");
+  const update = C.update;
+  const vupdate = async (mutate) => { setVErr(""); return V.update(mutate); };
 
-  // Change a copy, save it, and only then show it. A failed save changes nothing.
-  const update = (mutate) => {
-    const next = structuredClone(S); mutate(next);
-    const res = saveState(next);
-    if (!res.ok) { setSaveErr(res.error); return false; }
-    setSaveErr(""); setS(next); return true;
+  const doSignOut = async () => {
+    if (C.pending && !confirm("Some changes are not uploaded yet. Sign out anyway?")) return;
+    await signOut(auth);
+    try { await terminate(db); await clearIndexedDbPersistence(db); } catch { /* ignore */ }
+    location.reload();
   };
-  const vupdate = async (mutate) => {
-    const ok = await V.update(mutate);
-    if (!ok) setSaveErr("Could not save the private data. Your last change was not applied.");
-    else setSaveErr("");
-    return ok;
+
+  const migrate = () => {
+    update((s) => { for (const n of ["cats", "groups", "items"]) for (const x of localData[n] || []) if (!s[n].some((y) => y.id === x.id)) s[n].push(x); });
+    const lv = readLocal("keepsake.vault.v1");
+    if (lv && lv.w1 && V.status === "none") V.importMeta({ v: lv.v || 1, w1: lv.w1, w2: lv.w2, d: lv.d });
+    try { localStorage.setItem("keepsake.migrated", "1"); } catch { /* ignore */ }
+    setMigrated(true); notify("Moved to the cloud");
   };
+
+  // Print: show the print page, then open the print window (choose "Save as PDF").
+  useEffect(() => {
+    if (!job) return;
+    const done = () => setJob(null);
+    addEventListener("afterprint", done);
+    const t = setTimeout(() => window.print(), 400);
+    return () => { clearTimeout(t); removeEventListener("afterprint", done); };
+  }, [job]);
 
   // The private area locks itself as soon as you leave it.
   useEffect(() => { if (r[0] !== "v" && V.status === "open") V.lock(); });
 
   const ask = (title, initial, cb) => setDlg({ k: "name", title, initial, cb });
   const form = (title, fields, initial, cb) => setDlg({ k: "form", title, fields, initial, cb });
-  const ok = (b) => b;
 
   /* ---------- pages ---------- */
   const [a, b, c] = r;
@@ -67,7 +88,9 @@ export default function App() {
   if (cat) {
     const groups = S.groups.filter((g) => g.catId === cat.id).sort(byCreated);
     page = (<>
-      <Head title={cat.name} crumb="Category" onBack={() => go()} />
+      <Head title={cat.name} crumb="Category" onBack={() => go()}>
+        <button className="btn sm" onClick={() => setExp({ fixedId: cat.id })}>Export PDF</button>
+      </Head>
       <NameList rows={groups.map((g) => ({ id: g.id, name: g.name, count: S.items.filter((i) => i.groupId === g.id).length, unit: "item" }))}
         onAdd={() => ask("New category", "", (v) => update((s) => { s.groups.push({ ...mk(v), catId: cat.id }); }))}
         onOpen={(id) => go("g", id)}
@@ -100,7 +123,7 @@ export default function App() {
       onDelete={() => { if (confirm(`Delete "${itm.title}"?`) && update((s) => { s.items = s.items.filter((x) => x.id !== itm.id); })) go("g", itm.groupId); }} />;
   } else if (a === "v") {
     if (V.status !== "open") {
-      page = <VaultGate V={V} notify={notify} onBack={() => go()} />;
+      page = V.status === "loading" ? <p>Checking your lock… (needs internet the first time)</p> : <VaultGate key={V.status === "none" ? "n" : "l"} V={V} notify={notify} onBack={() => go()} />;
     } else if (vcat) {
       const items = vd.items.filter((i) => i.catId === vcat.id).sort(byCreated);
       const save = (it) => (vals) => vupdate((d) => {
@@ -146,19 +169,27 @@ export default function App() {
       onEdit={(id) => ask("Rename category", cats.find((k) => k.id === id).name, (v) => update((s) => { const k = s.cats.find((x) => x.id === id); k.name = v; k.updated = now(); }))}
       onDelete={(id) => { const k = cats.find((x) => x.id === id), gs = S.groups.filter((g) => g.catId === id).map((g) => g.id), n = S.items.filter((i) => gs.includes(i.groupId)).length;
         if (confirm(`Delete "${k.name}" with ${gs.length} categories and ${n} items inside? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => !gs.includes(i.groupId)); s.groups = s.groups.filter((g) => g.catId !== id); s.cats = s.cats.filter((x) => x.id !== id); }); }}
-      onLock={() => go("v")} />;
+      onLock={() => go("v")} onExport={() => (S.items.length ? setExp({}) : notify("Nothing to export yet."))}
+      notice={localData && !migrated && C.ready ? <div className="banner" style={{ background: "var(--acc)" }}>Found data saved only on this device. <button className="btn sm" onClick={migrate}>Move my data to the cloud</button></div> : null} />;
   }
 
-  return (
+  if (!C.ready) return <div className="wrap"><p>Loading your data…</p></div>;
+  return (<>
     <div className="wrap">
-      <nav><button className="logo px" aria-label="Keepsake home" onClick={() => go()}>KEEPSAKE</button></nav>
-      {(warn || saveErr) && <div className="banner" role="alert">{saveErr || warn}</div>}
+      <nav>
+        <button className="logo px" aria-label="Keepsake home" onClick={() => go()}>KEEPSAKE</button>
+        <span className="row"><span className="sync" role="status">{C.pending ? "Syncing…" : "Saved in cloud"}</span><button className="btn sm" onClick={doSignOut}>Sign out</button></span>
+      </nav>
+      {saveErr && <div className="banner" role="alert">{saveErr}</div>}
       {page}
+      {exp && <ExportDialog cats={S.cats.slice().sort(byCreated)} fixedId={exp.fixedId} onClose={() => setExp(null)}
+        onGo={(scope, pw) => { setExp(null); setJob({ scope, pw }); }} />}
       {dlg?.k === "name" && <NameDialog title={dlg.title} initial={dlg.initial} onClose={() => setDlg(null)}
-        onSave={async (v) => { if (ok(await dlg.cb(v))) setDlg(null); }} />}
+        onSave={async (v) => { if (await dlg.cb(v)) setDlg(null); }} />}
       {dlg?.k === "form" && <FormDialog title={dlg.title} fields={dlg.fields} initial={dlg.initial} onClose={() => setDlg(null)}
         onSave={async (vals) => { if (await dlg.cb(vals)) { setDlg(null); notify("Saved"); } else return "Could not save. Nothing was changed."; }} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
-  );
+    {job && <PrintView S={S} scope={job.scope} includePw={job.pw} />}
+  </>);
 }

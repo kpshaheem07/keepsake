@@ -1,22 +1,38 @@
-import { useRef, useState } from "react";
-import { createVault, openVault, changePassword, encryptData, loadMeta, saveMeta } from "@/lib/vault";
+import { useEffect, useRef, useState } from "react";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/firebase";
+import { createVault, openVault, changePassword, encryptData, decryptData } from "@/lib/vault";
+import { friendly } from "@/lib/errors";
 
-export function useVault() {
-  const first = useRef(null);
-  if (!first.current) first.current = loadMeta();
-  const meta = useRef(first.current.meta || null);
-  const dek = useRef(null);
-  const [status, setStatus] = useState(first.current.status); // none | locked | open | broken | blocked
+// The lock lives in ONE Firestore document. Only scrambled (encrypted) text is sent.
+export function useVault(uid, onError) {
+  const meta = useRef(null), dek = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | none | locked | open | error
   const [data, setData] = useState(null);
+  const ref = doc(db, "users", uid, "private", "vault");
+  const put = (m) => setDoc(ref, { meta: m }).catch((e) => onError(friendly(e)));
+
+  useEffect(() => onSnapshot(ref, async (snap) => {
+    if (!snap.exists()) {
+      meta.current = null;
+      // Only trust "no lock yet" when the server said so, so we never overwrite a real lock.
+      if (!snap.metadata.fromCache) setStatus((s) => (s === "open" ? s : "none"));
+      return;
+    }
+    const m = snap.data().meta;
+    const remote = !!meta.current && meta.current.d.ct !== m.d.ct;
+    meta.current = m;
+    setStatus((s) => (s === "loading" || s === "none" ? "locked" : s));
+    if (dek.current && remote && !snap.metadata.hasPendingWrites) { try { setData(await decryptData(dek.current, m.d)); } catch { /* keep current */ } }
+  }, () => setStatus("error")), [uid]);
 
   const open = (m, k, d) => { meta.current = m; dek.current = k; setData(d); setStatus("open"); };
 
   return {
     status, data,
-    // Make a new lock in memory. Nothing is saved until commit() is called.
     async prepare(password) {
       const v = await createVault(password);
-      return { recovery: v.recovery, commit: async () => { if (!saveMeta(v.meta)) return "Could not save the lock (storage full or blocked)."; open(v.meta, v.dek, v.data); return ""; } };
+      return { recovery: v.recovery, commit: async () => { put(v.meta); open(v.meta, v.dek, v.data); return ""; } };
     },
     async unlock(password) {
       try { const r = await openVault(meta.current, password, false); open(meta.current, r.dek, r.data); return ""; }
@@ -26,17 +42,15 @@ export function useVault() {
       try {
         const r = await openVault(meta.current, code, true);
         const m = await changePassword(meta.current, r.dek, newPassword);
-        if (!saveMeta(m)) return "Could not save the new password (storage full or blocked).";
-        open(m, r.dek, r.data); return "";
+        put(m); open(m, r.dek, r.data); return "";
       } catch { return "That Recovery code is not correct."; }
     },
+    importMeta(m) { meta.current = m; put(m); setStatus("locked"); },
     lock() { dek.current = null; setData(null); if (meta.current) setStatus("locked"); },
-    // Change the private data, encrypt it, save it. Only shows the change if saving worked.
     async update(mutate) {
       const next = structuredClone(data); mutate(next);
       const m = { ...meta.current, d: await encryptData(dek.current, next) };
-      if (!saveMeta(m)) return false;
-      meta.current = m; setData(next); return true;
+      put(m); meta.current = m; setData(next); return true;
     },
   };
 }

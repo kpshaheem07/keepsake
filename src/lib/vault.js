@@ -27,7 +27,7 @@ export async function encryptData(dek, data) {
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, dek, enc.encode(JSON.stringify(data)));
   return { iv: b64(iv), ct: b64(ct) };
 }
-async function decryptData(dek, d) {
+export async function decryptData(dek, d) {
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(d.iv) }, dek, unb64(d.ct));
   return JSON.parse(dec.decode(pt));
 }
@@ -54,12 +54,3 @@ export async function openVault(meta, secret, useRecovery) {
 export async function changePassword(meta, dek, newPassword) {
   return { ...meta, w1: await wrap(dek, newPassword) };
 }
-
-const KEY = "keepsake.vault.v1";
-export function loadMeta() {
-  let raw; try { raw = localStorage.getItem(KEY); } catch { return { status: "blocked" }; }
-  if (!raw) return { status: "none" };
-  try { const m = JSON.parse(raw); if (!m.w1 || !m.w2 || !m.d) throw 0; return { status: "locked", meta: m }; }
-  catch { return { status: "broken" }; }
-}
-export function saveMeta(meta) { try { localStorage.setItem(KEY, JSON.stringify(meta)); return true; } catch { return false; } }

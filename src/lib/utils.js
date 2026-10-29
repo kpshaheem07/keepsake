@@ -21,7 +21,9 @@ export async function copyText(text) {
   return ok;
 }
 
-export function resizeImage(file, max = 640) {
+export const byCreated = (a, b) => a.created.localeCompare(b.created);
+
+export function resizeImage(file, max = 600) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) return reject(new Error("Please choose an image file."));
     const r = new FileReader();
@@ -34,7 +36,9 @@ export function resizeImage(file, max = 640) {
         const c = document.createElement("canvas");
         c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
         c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-        resolve(c.toDataURL("image/jpeg", 0.8));
+        const url = c.toDataURL("image/jpeg", 0.7);
+        if (url.length > 700000) return reject(new Error("This image is too large. Please choose a smaller one."));
+        resolve(url);
       };
       im.src = r.result;
     };
