@@ -16,3 +16,20 @@ export const VAULT_FIELDS = [
   { key: "link", label: "Link (website)", type: "url" },
   { key: "note", label: "Note", type: "area" },
 ];
+
+export const PROJECT_FIELDS = [
+  { key: "title", label: "Project name", type: "text", required: true },
+  { key: "desc", label: "Details", type: "area", big: true },
+  { key: "tools", label: "Tools used", type: "area" },
+  { key: "emails", label: "Emails used", type: "area" },
+  { key: "password", label: "Login password", type: "secret" },
+  { key: "domain", label: "Domain used", type: "text" },
+  { key: "storage", label: "Storage system used", type: "text" },
+  { key: "link", label: "Link to open the project", type: "url" },
+  { key: "note", label: "Note", type: "area" },
+];
+export const CERT_FIELDS = [
+  { key: "title", label: "Heading (what the certificate is for)", type: "text", required: true },
+  { key: "file", label: "PDF or image file", type: "file" },
+  { key: "note", label: "Note", type: "area" },
+];

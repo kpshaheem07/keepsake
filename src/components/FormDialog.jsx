@@ -1,10 +1,10 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 import SecretInput from "./SecretInput.jsx";
-import { normalizeUrl, resizeImage } from "@/lib/utils";
+import { normalizeUrl, resizeImage, prepareCertFile } from "@/lib/utils";
 
 export default function FormDialog({ title, fields, initial = {}, onSave, onClose }) {
-  const [f, setF] = useState(() => Object.fromEntries(fields.map((x) => [x.key, initial[x.key] || ""])));
+  const [f, setF] = useState(() => Object.fromEntries(fields.flatMap((x) => x.type === "file" ? [[x.key, initial[x.key] || ""], [x.key + "Name", initial[x.key + "Name"] || ""], [x.key + "Type", initial[x.key + "Type"] || ""]] : [[x.key, initial[x.key] || ""]])));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -12,6 +12,11 @@ export default function FormDialog({ title, fields, initial = {}, onSave, onClos
   const pick = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     try { setF({ ...f, image: await resizeImage(file) }); setErr(""); } catch (x) { setErr(x.message); }
+  };
+  const pickFile = (key) => async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try { const r = await prepareCertFile(file); setF({ ...f, [key]: r.url, [key + "Name"]: r.name, [key + "Type"]: r.type }); setErr(""); }
+    catch (x) { setErr(x.message); e.target.value = ""; }
   };
   const submit = async (e) => {
     e.preventDefault();
@@ -42,6 +47,10 @@ export default function FormDialog({ title, fields, initial = {}, onSave, onClos
               {x.type === "image" && (<>
                 <input id={id} type="file" accept="image/*" onChange={pick} />
                 {f.image && <div><img src={f.image} alt="Preview" style={{ maxHeight: 120, maxWidth: "100%" }} /><button type="button" className="btn sm" onClick={() => setF({ ...f, image: "" })}>Remove image</button></div>}
+              </>)}
+              {x.type === "file" && (<>
+                <input id={id} type="file" accept="application/pdf,image/*" onChange={pickFile(x.key)} />
+                {f[x.key] && <div className="row"><span>Saved file: <b>{f[x.key + "Name"]}</b></span><button type="button" className="btn sm" onClick={() => setF({ ...f, [x.key]: "", [x.key + "Name"]: "", [x.key + "Type"]: "" })}>Remove file</button></div>}
               </>)}
               {x.type === "date" && <input id={id} type="date" value={f[x.key]} onChange={set(x.key)} />}
               {["text", "url", "email"].includes(x.type) && <input id={id} maxLength={x.type === "text" ? 120 : 500} inputMode={x.type === "url" ? "url" : undefined} placeholder={x.type === "url" ? "https://…" : undefined} value={f[x.key]} onChange={set(x.key)} autoFocus={i === 0} />}

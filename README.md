@@ -18,8 +18,11 @@ Vercel updates the website by itself in about 2 minutes.
 - Sign in with the email and password you made in Firebase > Authentication > Users.
 - Home: + Add category. Open one: + Add category again. Open one: numbered list, + Add.
 - Click a heading for the big page with Copy buttons.
-- Export PDF: on Home (everything or one category) or inside a category.
+- Export PDF (categories only; Projects, Certificates and the Private lock are not included): on Home (everything or one category) or inside a category.
   Passwords are left out unless you tick "Include passwords". The Private lock is never exported.
+- My Projects (bottom of Home): name, details, tools, emails, login password, domain, storage system, link, note.
+- My Certificates (bottom of Home): heading, ONE PDF or image, note. Open it, or press Download.
+  A PDF can be up to about 600 KB. Images are shrunk automatically.
 - Private lock (bottom of Home): your own encrypted area. Make a password, SAVE THE RECOVERY CODE.
 - If you see "Found data saved only on this device", press "Move my data to the cloud" once.
 - Sign out removes the saved copy from this device.

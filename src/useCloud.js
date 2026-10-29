@@ -3,12 +3,12 @@ import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "@/firebase";
 import { friendly } from "@/lib/errors";
 
-const NAMES = ["cats", "groups", "items"];
+const NAMES = ["cats", "groups", "items", "projects", "certs"];
 
 // Live copy of your data from Firestore. Writes show up at once on this device
 // (even offline) and upload when the internet is there.
 export function useCloud(uid) {
-  const rows = useRef({ cats: [], groups: [], items: [] });
+  const rows = useRef({ cats: [], groups: [], items: [], projects: [], certs: [] });
   const [S, setS] = useState(rows.current);
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);

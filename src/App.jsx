@@ -7,6 +7,7 @@ import Detail from "@/components/Detail.jsx";
 import FormDialog from "@/components/FormDialog.jsx";
 import NameDialog from "@/components/NameDialog.jsx";
 import VaultGate from "@/components/VaultGate.jsx";
+import CertDetail from "@/components/CertDetail.jsx";
 import ExportDialog from "@/components/ExportDialog.jsx";
 import PrintView from "@/components/PrintView.jsx";
 import { signOut } from "firebase/auth";
@@ -16,7 +17,7 @@ import { useCloud } from "@/useCloud";
 import { useVault } from "@/useVault";
 import { useRoute, go } from "@/lib/hash";
 import { uid, copyText, byCreated } from "@/lib/utils";
-import { ITEM_FIELDS, VAULT_FIELDS } from "@/fields";
+import { ITEM_FIELDS, VAULT_FIELDS, PROJECT_FIELDS, CERT_FIELDS } from "@/fields";
 
 const now = () => new Date().toISOString();
 const mk = (name) => ({ id: uid(), name, created: now(), updated: now() });
@@ -121,6 +122,33 @@ export default function App({ user }) {
       warn="This password is saved without a lock. Put very important secrets in the Private lock."
       onEdit={() => form("Edit", ITEM_FIELDS, itm, (vals) => update((s) => { s.items = s.items.map((x) => (x.id === itm.id ? { ...x, ...vals, updated: now() } : x)); }))}
       onDelete={() => { if (confirm(`Delete "${itm.title}"?`) && update((s) => { s.items = s.items.filter((x) => x.id !== itm.id); })) go("g", itm.groupId); }} />;
+  } else if (a === "pr" || a === "ce") {
+    const isP = a === "pr", name = isP ? "projects" : "certs", fields = isP ? PROJECT_FIELDS : CERT_FIELDS;
+    const label = isP ? "My Projects" : "My Certificates";
+    const rowsAll = S[name].slice().sort(byCreated);
+    const row = b && rowsAll.find((x) => x.id === b);
+    const save = (it) => (vals) => update((s) => {
+      if (it) s[name] = s[name].map((x) => (x.id === it.id ? { ...x, ...vals, updated: now() } : x));
+      else s[name].push({ id: uid(), ...vals, created: now(), updated: now() });
+    });
+    const del = (it) => { if (confirm(`Delete "${it.title}"?`)) { update((s) => { s[name] = s[name].filter((x) => x.id !== it.id); }); return true; } return false; };
+    if (row && isP) {
+      page = <Detail title={row.title} crumb={label} fields={fields} values={row} onBack={() => go("pr")} onCopy={copy}
+        warn="This password is saved without a lock. Put very important secrets in the Private lock."
+        onEdit={() => form("Edit", fields, row, save(row))} onDelete={() => { if (del(row)) go("pr"); }} />;
+    } else if (row) {
+      page = <CertDetail cert={row} onBack={() => go("ce")} onEdit={() => form("Edit", fields, row, save(row))} onDelete={() => { if (del(row)) go("ce"); }} />;
+    } else {
+      page = (<>
+        <Head title={label} crumb="Home" onBack={() => go()} />
+        <NumList rows={rowsAll.map((x) => ({ id: x.id, title: x.title, sub: isP ? x.domain : x.fileName, text: [x.desc, x.tools, x.emails, x.domain, x.storage, x.note, x.link, x.fileName].join(" ") }))}
+          onAdd={() => form(isP ? "Add project" : "Add certificate", fields, {}, save(null))}
+          onOpen={(id) => go(a, id)}
+          onEdit={(id) => form("Edit", fields, rowsAll.find((x) => x.id === id), save(rowsAll.find((x) => x.id === id)))}
+          onDelete={(id) => del(rowsAll.find((x) => x.id === id))}
+          empty={isP ? "No projects yet. Press “+ Add”." : "No certificates yet. Press “+ Add”."} />
+      </>);
+    }
   } else if (a === "v") {
     if (V.status !== "open") {
       page = V.status === "loading" ? <p>Checking your lock… (needs internet the first time)</p> : <VaultGate key={V.status === "none" ? "n" : "l"} V={V} notify={notify} onBack={() => go()} />;
@@ -169,7 +197,7 @@ export default function App({ user }) {
       onEdit={(id) => ask("Rename category", cats.find((k) => k.id === id).name, (v) => update((s) => { const k = s.cats.find((x) => x.id === id); k.name = v; k.updated = now(); }))}
       onDelete={(id) => { const k = cats.find((x) => x.id === id), gs = S.groups.filter((g) => g.catId === id).map((g) => g.id), n = S.items.filter((i) => gs.includes(i.groupId)).length;
         if (confirm(`Delete "${k.name}" with ${gs.length} categories and ${n} items inside? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => !gs.includes(i.groupId)); s.groups = s.groups.filter((g) => g.catId !== id); s.cats = s.cats.filter((x) => x.id !== id); }); }}
-      onLock={() => go("v")} onExport={() => (S.items.length ? setExp({}) : notify("Nothing to export yet."))}
+      onLock={() => go("v")} onProjects={() => go("pr")} onCerts={() => go("ce")} onExport={() => (S.items.length ? setExp({}) : notify("Nothing to export yet."))}
       notice={localData && !migrated && C.ready ? <div className="banner" style={{ background: "var(--acc)" }}>Found data saved only on this device. <button className="btn sm" onClick={migrate}>Move my data to the cloud</button></div> : null} />;
   }
 

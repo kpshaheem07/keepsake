@@ -5,7 +5,7 @@ import BlackHole from "@/components/BlackHoleFallback";
 import NameList from "./NameList.jsx";
 import Lock from "./Lock.jsx";
 
-export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, onExport, notice }) {
+export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, onExport, onProjects, onCerts, notice }) {
   return (
     <>
       {notice}
@@ -20,6 +20,8 @@ export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, on
       <NameList rows={rows} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} placeholder="Search categories…" empty="No categories yet. Press “+ Add category” to make your first one." />
       <div className="foot">
         <div className="row" style={{ justifyContent: "center", gap: 12 }}>
+          <button className="btn" onClick={onProjects}>My Projects</button>
+          <button className="btn" onClick={onCerts}>My Certificates</button>
           <button className="btn" onClick={onExport}>Export PDF</button>
           <button className="btn" onClick={onLock}><Lock /> Private lock</button>
         </div>
