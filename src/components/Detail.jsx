@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { fmt } from "@/lib/utils";
+import Attachments from "./Attachments.jsx";
 
-export default function Detail({ title, crumb, fields, values, onBack, onEdit, onDelete, onCopy, warn }) {
+export default function Detail({ title, crumb, fields, values, onBack, onEdit, onDelete, onCopy, warn, uid }) {
   const [show, setShow] = useState({});
   const due = values.reminder && values.reminder <= new Date().toISOString().slice(0, 10);
   return (
@@ -29,6 +30,7 @@ export default function Detail({ title, crumb, fields, values, onBack, onEdit, o
           </section>
         );
       })}
+      {uid && <Attachments uid={uid} item={values} />}
       {warn && values.password && <p className="tag" style={{ textTransform: "none" }}>{warn}</p>}
       <div className="row" style={{ margin: "16px 0" }}>
         <button className="btn y" onClick={onEdit}>Edit</button>

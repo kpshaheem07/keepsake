@@ -16,7 +16,7 @@ import { auth, db } from "@/firebase";
 import { useCloud } from "@/useCloud";
 import { useVault } from "@/useVault";
 import { useRoute, go } from "@/lib/hash";
-import { uid, copyText, byCreated } from "@/lib/utils";
+import { uid, copyText, byCreated, fileCount } from "@/lib/utils";
 import { ITEM_FIELDS, VAULT_FIELDS, PROJECT_FIELDS, CERT_FIELDS } from "@/fields";
 
 const now = () => new Date().toISOString();
@@ -69,6 +69,24 @@ export default function App({ user }) {
     return () => { clearTimeout(t); removeEventListener("afterprint", done); };
   }, [job]);
 
+  const withFiles = (row) => ({ ...row, files: [...(row.fileMeta || []), ...(row.file ? [{ id: "legacy", name: row.fileName || "certificate", type: row.fileType || "application/pdf", size: 0, data: row.file }] : [])] });
+  const subText = (t, r) => [t, fileCount([r]) ? `${fileCount([r])} file${fileCount([r]) === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+  const delMsg = (t, r) => { const n = fileCount([r]); return `Delete "${t}"${n ? ` and its ${n} file${n === 1 ? "" : "s"}` : ""}?`; };
+  // Save an item/project/certificate together with its files (one write).
+  const saveWith = (name, it, extra) => (vals) => {
+    const { files = [], ...rest } = vals;
+    const ownerId = it?.id || uid(), meta = [], adds = [];
+    for (const f of files) {
+      if (f.data) { const id = uid(); adds.push({ id, data: { id, ownerId, name: f.name, type: f.type, size: f.size, data: f.data, created: now() } }); meta.push({ id, name: f.name, type: f.type, size: f.size }); }
+      else meta.push({ id: f.id, name: f.name, type: f.type, size: f.size });
+    }
+    if (it?.file) Object.assign(rest, { file: "", fileName: "", fileType: "" });
+    return update((s) => {
+      if (it) s[name] = s[name].map((x) => (x.id === it.id ? { ...x, ...rest, fileMeta: meta, updated: now() } : x));
+      else s[name].push({ id: ownerId, ...extra, ...rest, fileMeta: meta, created: now(), updated: now() });
+    }, adds);
+  };
+
   // The private area locks itself as soon as you leave it.
   useEffect(() => { if (r[0] !== "v" && V.status === "open") V.lock(); });
 
@@ -96,55 +114,49 @@ export default function App({ user }) {
         onAdd={() => ask("New category", "", (v) => update((s) => { s.groups.push({ ...mk(v), catId: cat.id }); }))}
         onOpen={(id) => go("g", id)}
         onEdit={(id) => ask("Rename category", groups.find((g) => g.id === id).name, (v) => update((s) => { const g = s.groups.find((x) => x.id === id); g.name = v; g.updated = now(); }))}
-        onDelete={(id) => { const g = groups.find((x) => x.id === id), n = S.items.filter((i) => i.groupId === id).length; if (confirm(`Delete "${g.name}" and its ${n} items? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => i.groupId !== id); s.groups = s.groups.filter((x) => x.id !== id); }); }}
+        onDelete={(id) => { const g = groups.find((x) => x.id === id), its = S.items.filter((i) => i.groupId === id), n = its.length, fc = fileCount(its); if (confirm(`Delete "${g.name}" and its ${n} items${fc ? ` and ${fc} files` : ""}? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => i.groupId !== id); s.groups = s.groups.filter((x) => x.id !== id); }); }}
         empty="Nothing here yet. Press “+ Add category”." placeholder="Search…" />
     </>);
   } else if (grp) {
     const pc = S.cats.find((x) => x.id === grp.catId);
     const items = S.items.filter((i) => i.groupId === grp.id).sort(byCreated);
-    const save = (it) => (vals) => update((s) => {
-      if (it) s.items = s.items.map((x) => (x.id === it.id ? { ...x, ...vals, updated: now() } : x));
-      else s.items.push({ id: uid(), groupId: grp.id, ...vals, created: now(), updated: now() });
-    });
+    const save = (it) => saveWith("items", it, { groupId: grp.id });
     page = (<>
       <Head title={grp.name} crumb={pc?.name} onBack={() => go("c", grp.catId)} />
-      <NumList rows={items.map((i) => ({ id: i.id, title: i.title, sub: i.purpose, text: [i.prompt, i.purpose, i.note, i.link].join(" ") }))}
+      <NumList rows={items.map((i) => ({ id: i.id, title: i.title, sub: subText(i.purpose, i), text: [i.prompt, i.purpose, i.note, i.link].join(" ") }))}
         onAdd={() => form("Add", ITEM_FIELDS, {}, save(null))}
         onOpen={(id) => go("i", id)}
-        onEdit={(id) => form("Edit", ITEM_FIELDS, items.find((x) => x.id === id), save(items.find((x) => x.id === id)))}
-        onDelete={(id) => { if (confirm(`Delete "${items.find((x) => x.id === id).title}"?`)) update((s) => { s.items = s.items.filter((x) => x.id !== id); }); }}
+        onEdit={(id) => form("Edit", ITEM_FIELDS, withFiles(items.find((x) => x.id === id)), save(items.find((x) => x.id === id)))}
+        onDelete={(id) => { if (confirm(delMsg(items.find((x) => x.id === id).title, items.find((x) => x.id === id)))) update((s) => { s.items = s.items.filter((x) => x.id !== id); }); }}
         empty="Nothing saved yet. Press “+ Add”." />
     </>);
   } else if (itm) {
     const g = S.groups.find((x) => x.id === itm.groupId), pc = g && S.cats.find((x) => x.id === g.catId);
-    page = <Detail title={itm.title} crumb={`${pc?.name || ""} › ${g?.name || ""}`} fields={ITEM_FIELDS} values={itm}
+    page = <Detail title={itm.title} crumb={`${pc?.name || ""} › ${g?.name || ""}`} fields={ITEM_FIELDS} values={itm} uid={me}
       onBack={() => go("g", itm.groupId)} onCopy={copy}
       warn="This password is saved without a lock. Put very important secrets in the Private lock."
-      onEdit={() => form("Edit", ITEM_FIELDS, itm, (vals) => update((s) => { s.items = s.items.map((x) => (x.id === itm.id ? { ...x, ...vals, updated: now() } : x)); }))}
-      onDelete={() => { if (confirm(`Delete "${itm.title}"?`) && update((s) => { s.items = s.items.filter((x) => x.id !== itm.id); })) go("g", itm.groupId); }} />;
+      onEdit={() => form("Edit", ITEM_FIELDS, withFiles(itm), saveWith("items", itm))}
+      onDelete={() => { if (confirm(delMsg(itm.title, itm)) && update((s) => { s.items = s.items.filter((x) => x.id !== itm.id); })) go("g", itm.groupId); }} />;
   } else if (a === "pr" || a === "ce") {
     const isP = a === "pr", name = isP ? "projects" : "certs", fields = isP ? PROJECT_FIELDS : CERT_FIELDS;
     const label = isP ? "My Projects" : "My Certificates";
     const rowsAll = S[name].slice().sort(byCreated);
     const row = b && rowsAll.find((x) => x.id === b);
-    const save = (it) => (vals) => update((s) => {
-      if (it) s[name] = s[name].map((x) => (x.id === it.id ? { ...x, ...vals, updated: now() } : x));
-      else s[name].push({ id: uid(), ...vals, created: now(), updated: now() });
-    });
-    const del = (it) => { if (confirm(`Delete "${it.title}"?`)) { update((s) => { s[name] = s[name].filter((x) => x.id !== it.id); }); return true; } return false; };
+    const save = (it) => saveWith(name, it, {});
+    const del = (it) => { if (confirm(delMsg(it.title, it))) { update((s) => { s[name] = s[name].filter((x) => x.id !== it.id); }); return true; } return false; };
     if (row && isP) {
-      page = <Detail title={row.title} crumb={label} fields={fields} values={row} onBack={() => go("pr")} onCopy={copy}
+      page = <Detail title={row.title} crumb={label} fields={fields} values={row} uid={me} onBack={() => go("pr")} onCopy={copy}
         warn="This password is saved without a lock. Put very important secrets in the Private lock."
-        onEdit={() => form("Edit", fields, row, save(row))} onDelete={() => { if (del(row)) go("pr"); }} />;
+        onEdit={() => form("Edit", fields, withFiles(row), save(row))} onDelete={() => { if (del(row)) go("pr"); }} />;
     } else if (row) {
-      page = <CertDetail cert={row} onBack={() => go("ce")} onEdit={() => form("Edit", fields, row, save(row))} onDelete={() => { if (del(row)) go("ce"); }} />;
+      page = <CertDetail uid={me} cert={row} onBack={() => go("ce")} onEdit={() => form("Edit", fields, withFiles(row), save(row))} onDelete={() => { if (del(row)) go("ce"); }} />;
     } else {
       page = (<>
         <Head title={label} crumb="Home" onBack={() => go()} />
-        <NumList rows={rowsAll.map((x) => ({ id: x.id, title: x.title, sub: isP ? x.domain : x.fileName, text: [x.desc, x.tools, x.emails, x.domain, x.storage, x.note, x.link, x.fileName].join(" ") }))}
+        <NumList rows={rowsAll.map((x) => ({ id: x.id, title: x.title, sub: subText(isP ? x.domain : "", x), text: [x.desc, x.tools, x.emails, x.domain, x.storage, x.note, x.link, x.fileName].join(" ") }))}
           onAdd={() => form(isP ? "Add project" : "Add certificate", fields, {}, save(null))}
           onOpen={(id) => go(a, id)}
-          onEdit={(id) => form("Edit", fields, rowsAll.find((x) => x.id === id), save(rowsAll.find((x) => x.id === id)))}
+          onEdit={(id) => form("Edit", fields, withFiles(rowsAll.find((x) => x.id === id)), save(rowsAll.find((x) => x.id === id)))}
           onDelete={(id) => del(rowsAll.find((x) => x.id === id))}
           empty={isP ? "No projects yet. Press “+ Add”." : "No certificates yet. Press “+ Add”."} />
       </>);
@@ -195,8 +207,8 @@ export default function App({ user }) {
       onAdd={() => ask("New category", "", (v) => update((s) => { s.cats.push(mk(v)); }))}
       onOpen={(id) => go("c", id)}
       onEdit={(id) => ask("Rename category", cats.find((k) => k.id === id).name, (v) => update((s) => { const k = s.cats.find((x) => x.id === id); k.name = v; k.updated = now(); }))}
-      onDelete={(id) => { const k = cats.find((x) => x.id === id), gs = S.groups.filter((g) => g.catId === id).map((g) => g.id), n = S.items.filter((i) => gs.includes(i.groupId)).length;
-        if (confirm(`Delete "${k.name}" with ${gs.length} categories and ${n} items inside? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => !gs.includes(i.groupId)); s.groups = s.groups.filter((g) => g.catId !== id); s.cats = s.cats.filter((x) => x.id !== id); }); }}
+      onDelete={(id) => { const k = cats.find((x) => x.id === id), gs = S.groups.filter((g) => g.catId === id).map((g) => g.id), its = S.items.filter((i) => gs.includes(i.groupId)), n = its.length, fc = fileCount(its);
+        if (confirm(`Delete "${k.name}" with ${gs.length} categories and ${n} items${fc ? ` and ${fc} files` : ""} inside? This cannot be undone.`)) update((s) => { s.items = s.items.filter((i) => !gs.includes(i.groupId)); s.groups = s.groups.filter((g) => g.catId !== id); s.cats = s.cats.filter((x) => x.id !== id); }); }}
       onLock={() => go("v")} onProjects={() => go("pr")} onCerts={() => go("ce")} onExport={() => (S.items.length ? setExp({}) : notify("Nothing to export yet."))}
       notice={localData && !migrated && C.ready ? <div className="banner" style={{ background: "var(--acc)" }}>Found data saved only on this device. <button className="btn sm" onClick={migrate}>Move my data to the cloud</button></div> : null} />;
   }

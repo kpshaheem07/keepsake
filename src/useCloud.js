@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/firebase";
 import { friendly } from "@/lib/errors";
 
@@ -29,16 +29,29 @@ export function useCloud(uid) {
   }, [uid]);
 
   // Change a copy, find what is different, write only that.
-  const update = (mutate) => {
+  // Files live in their own records ("files"). Removed or replaced files are deleted automatically.
+  const update = (mutate, adds = []) => {
     const old = rows.current, next = structuredClone(old);
     mutate(next);
     const ops = [];
     for (const n of NAMES) {
-      const before = new Map(old[n].map((r) => [r.id, JSON.stringify(r)]));
+      const oldBy = new Map(old[n].map((r) => [r.id, r]));
       const ids = new Set();
-      for (const r of next[n]) { ids.add(r.id); if (before.get(r.id) !== JSON.stringify(r)) ops.push({ n, id: r.id, data: r }); }
-      for (const id of before.keys()) if (!ids.has(id)) ops.push({ n, id, del: true });
+      for (const r of next[n]) {
+        ids.add(r.id);
+        const o = oldBy.get(r.id);
+        if (!o || JSON.stringify(o) !== JSON.stringify(r)) {
+          ops.push({ n, id: r.id, data: r });
+          const keep = new Set((r.fileMeta || []).map((m) => m.id));
+          for (const m of o?.fileMeta || []) if (!keep.has(m.id)) ops.push({ n: "files", id: m.id, del: true });
+        }
+      }
+      for (const [id, o] of oldBy) if (!ids.has(id)) {
+        ops.push({ n, id, del: true });
+        for (const m of o.fileMeta || []) ops.push({ n: "files", id: m.id, del: true });
+      }
     }
+    for (const a of adds) ops.push({ n: "files", id: a.id, data: a.data });
     for (let i = 0; i < ops.length; i += 400) {
       const b = writeBatch(db);
       for (const o of ops.slice(i, i + 400)) {
@@ -50,4 +63,16 @@ export function useCloud(uid) {
     return true;
   };
   return { S, ready, pending, error, update };
+}
+
+// Files of ONE item, loaded only when you open it.
+export function useFiles(uid, ownerId, enabled) {
+  const [files, setFiles] = useState({});
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, "users", uid, "files"), where("ownerId", "==", ownerId));
+    return onSnapshot(q, (snap) => setFiles(Object.fromEntries(snap.docs.map((d) => [d.id, { ...d.data(), id: d.id }]))), (e) => setErr(friendly(e)));
+  }, [uid, ownerId, enabled]);
+  return { files, err };
 }

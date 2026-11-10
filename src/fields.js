@@ -8,6 +8,7 @@ export const ITEM_FIELDS = [
   { key: "image", label: "Image", type: "image" },
   { key: "note", label: "Note", type: "area" },
   { key: "reminder", label: "Reminder date", type: "date" },
+  { key: "files", label: "Files (PDF, TXT or images, up to 5)", type: "files" },
 ];
 export const VAULT_FIELDS = [
   { key: "title", label: "Heading (which API or secret)", type: "text", required: true },
@@ -27,9 +28,10 @@ export const PROJECT_FIELDS = [
   { key: "storage", label: "Storage system used", type: "text" },
   { key: "link", label: "Link to open the project", type: "url" },
   { key: "note", label: "Note", type: "area" },
+  { key: "files", label: "Files (PDF, TXT or images, up to 5)", type: "files" },
 ];
 export const CERT_FIELDS = [
   { key: "title", label: "Heading (what the certificate is for)", type: "text", required: true },
-  { key: "file", label: "PDF or image file", type: "file" },
+  { key: "files", label: "Files (PDF, TXT or images, up to 5)", type: "files" },
   { key: "note", label: "Note", type: "area" },
 ];

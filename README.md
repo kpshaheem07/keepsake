@@ -20,9 +20,12 @@ Vercel updates the website by itself in about 2 minutes.
 - Click a heading for the big page with Copy buttons.
 - Export PDF (categories only; Projects, Certificates and the Private lock are not included): on Home (everything or one category) or inside a category.
   Passwords are left out unless you tick "Include passwords". The Private lock is never exported.
+- Files: items, projects and certificates can each hold up to 5 files (PDF, TXT or images).
+  Each file can be up to about 740 KB. Images are shrunk automatically. Files are NOT encrypted.
+  Deleting an item also deletes its files. The Private lock has no file upload.
 - My Projects (bottom of Home): name, details, tools, emails, login password, domain, storage system, link, note.
 - My Certificates (bottom of Home): heading, ONE PDF or image, note. Open it, or press Download.
-  A PDF can be up to about 600 KB. Images are shrunk automatically.
+  Old single-file certificates still open; they move to the new way when you edit them.
 - Private lock (bottom of Home): your own encrypted area. Make a password, SAVE THE RECOVERY CODE.
 - If you see "Found data saved only on this device", press "Move my data to the cloud" once.
 - Sign out removes the saved copy from this device.
@@ -36,6 +39,6 @@ Vercel updates the website by itself in about 2 minutes.
 
 ## Limits
 - Free plan: about 50,000 reads and 20,000 writes per day.
-- Images are shrunk and kept inside the database (Firebase file storage needs a paid plan since Feb 2026). One small image per item.
+- Files are kept inside the free database (Firebase Cloud Storage needs a paid plan). Each file is its own record, up to about 740 KB.
 - Needs internet to sync. Without internet the app shows the last saved copy and uploads changes later.
 - If two devices change the same Private lock at the same moment, the last save wins.

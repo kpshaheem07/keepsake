@@ -61,26 +61,39 @@ export function normalizeUrl(raw) {
 
 const readDataUrl = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onerror = () => rej(new Error("That file could not be read.")); r.onload = () => res(r.result); r.readAsDataURL(file); });
 
-// One PDF or image per certificate. Kept inside the free database, so it must stay small.
-export const MAX_PDF = 600 * 1024;
-export async function prepareCertFile(file) {
-  if (file.type === "application/pdf") {
-    if (file.size > MAX_PDF) throw new Error(`This PDF is too big (${Math.round(file.size / 1024)} KB). The limit is 600 KB.`);
-    return { url: await readDataUrl(file), name: file.name, type: file.type };
+// Files (PDF, TXT, images) are kept inside the free database, one record per file.
+export const MAX_FILE = 740 * 1024;
+export const MAX_FILES = 5;
+export async function prepareFile(file) {
+  const kb = Math.round(file.size / 1024);
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const isTxt = file.type === "text/plain" || /\.txt$/i.test(file.name);
+  if (isPdf || isTxt) {
+    if (file.size > MAX_FILE) throw new Error(`"${file.name}" is too big (${kb} KB). The limit is 740 KB.`);
+    const type = isPdf ? "application/pdf" : "text/plain";
+    const data = (await readDataUrl(file)).replace(/^data:[^;,]*/, "data:" + type);
+    return { name: file.name, type, size: file.size, data };
   }
-  if (!file.type.startsWith("image/")) throw new Error("Please choose a PDF or an image.");
+  if (!file.type.startsWith("image/")) throw new Error(`"${file.name}" is not a PDF, TXT or image file.`);
   const src = await readDataUrl(file);
-  const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That image could not be read.")); i.src = src; });
+  const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(`"${file.name}" could not be read.`)); i.src = src; });
   for (const max of [1600, 1280, 1000, 800]) {
     const sc = Math.min(1, max / Math.max(im.width, im.height));
     const c = document.createElement("canvas"); c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
     c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
     for (const q of [0.85, 0.75, 0.65, 0.5]) {
       const url = c.toDataURL("image/jpeg", q);
-      if (url.length <= 800000) return { url, name: file.name.replace(/\.[^.]+$/, "") + ".jpg", type: "image/jpeg" };
+      if (url.length <= 960000) return { name: file.name.replace(/\.[^.]+$/, "") + ".jpg", type: "image/jpeg", size: Math.round(url.length * 0.75), data: url };
     }
   }
-  throw new Error("This image is too large to save. Please choose a smaller one.");
+  throw new Error(`"${file.name}" is too large to save. Please choose a smaller one.`);
+}
+export const fileCount = (rows) => rows.reduce((n, r) => n + (r.fileMeta?.length || (r.file ? 1 : 0)), 0);
+export const kbText = (n) => (n ? Math.max(1, Math.round(n / 1024)) + " KB" : "");
+export function dataUrlToText(u) {
+  const bin = atob(u.split(",")[1]), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(arr);
 }
 export function dataUrlToBlob(u) {
   const [h, b] = u.split(",");

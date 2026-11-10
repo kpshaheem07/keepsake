@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { dataUrlToBlob, fmt } from "@/lib/utils";
+import Attachments from "./Attachments.jsx";
 
-export default function CertDetail({ cert, onBack, onEdit, onDelete }) {
+export default function CertDetail({ uid, cert, onBack, onEdit, onDelete }) {
   const [blob, setBlob] = useState("");
   useEffect(() => {
     if (!cert.file) { setBlob(""); return; }
@@ -26,7 +27,8 @@ export default function CertDetail({ cert, onBack, onEdit, onDelete }) {
           <span className="tag" style={{ textTransform: "none" }}>{cert.fileName}</span>
         </div>
       )}
-      {!cert.file && <div className="empty" style={{ margin: "12px 0" }}>No file saved. Press Edit to add one.</div>}
+      <Attachments uid={uid} item={cert} />
+      {!cert.file && !(cert.fileMeta || []).length && <div className="empty" style={{ margin: "12px 0" }}>No file saved. Press Edit to add one.</div>}
       {cert.note && <section className="panel"><span className="tag">Note</span><div className="val">{cert.note}</div></section>}
       <div className="row" style={{ margin: "16px 0" }}>
         <button className="btn y" onClick={onEdit}>Edit</button>
