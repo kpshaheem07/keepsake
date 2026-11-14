@@ -101,3 +101,38 @@ export function dataUrlToBlob(u) {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: (h.match(/:(.*?);/) || [])[1] || "application/octet-stream" });
 }
+
+// ---- Saving and opening files so it works on desktop, Android and iPhone/iPad ----
+export const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+export function canShareFiles() {
+  try { const f = new File(["x"], "x.txt", { type: "text/plain" }); return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [f] })); }
+  catch { return false; }
+}
+// Opens the phone's own share menu ("Save to Files", "Drive", ...).
+export async function shareFile(name, dataUrl) {
+  const blob = dataUrlToBlob(dataUrl);
+  const f = new File([blob], name, { type: blob.type });
+  try { await navigator.share({ files: [f], title: name }); return "shared"; }
+  catch (e) { return e && e.name === "AbortError" ? "cancelled" : "failed"; }
+}
+// iPhone/iPad: share menu (it has "Save to Files"). Desktop and Android: normal download.
+export async function saveFile(name, dataUrl) {
+  if (isIOS() && canShareFiles()) {
+    const r = await shareFile(name, dataUrl);
+    if (r !== "failed") return r;
+  }
+  const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.style.display = "none";
+  document.body.append(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+  return "downloaded";
+}
+// Opens the file in a new tab. If the phone blocks that, opens it in this tab (use Back to return).
+export function openFile(dataUrl) {
+  const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
+  const w = window.open(url, "_blank");
+  if (!w) location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 300000);
+}

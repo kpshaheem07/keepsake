@@ -20,6 +20,7 @@ Vercel updates the website by itself in about 2 minutes.
 - Click a heading for the big page with Copy buttons.
 - Export PDF (categories only; Projects, Certificates and the Private lock are not included): on Home (everything or one category) or inside a category.
   Passwords are left out unless you tick "Include passwords". The Private lock is never exported.
+- Download / Open / Share: Download saves the file on desktop and Android. On iPhone and iPad it opens the share menu (choose Save to Files). Open shows the file in a new tab. Android also has a Share button.
 - Files: items, projects and certificates can each hold up to 5 files (PDF, TXT or images).
   Each file can be up to about 740 KB. Images are shrunk automatically. Files are NOT encrypted.
   Deleting an item also deletes its files. The Private lock has no file upload.
