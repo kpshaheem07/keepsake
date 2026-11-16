@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useFiles } from "@/useCloud";
-import { dataUrlToBlob, dataUrlToText, kbText, copyText, saveFile, shareFile, openFile, canShareFiles, isIOS, inAppBrowser } from "@/lib/utils";
+import { dataUrlToBlob, dataUrlToText, kbText, copyText, saveFile, shareFile, openFile, canShareFiles, isIOS, inAppBrowser, isEmptyData } from "@/lib/utils";
 
 // Download / Share / Open buttons that work on desktop, Android and iPhone.
 export function InAppNotice() {
@@ -34,8 +34,9 @@ function FileCard({ meta, file }) {
   const [url, setUrl] = useState(""); const [text, setText] = useState(""); const [copied, setCopied] = useState("");
   const img = meta.type?.startsWith("image/"), pdf = meta.type === "application/pdf", txt = meta.type === "text/plain";
   const desktop = typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches;
+  const empty = !!file && isEmptyData(file.data);
   useEffect(() => {
-    if (!file?.data) { setUrl(""); setText(""); return; }
+    if (!file?.data || empty) { setUrl(""); setText(""); return; }
     if (txt) { try { setText(dataUrlToText(file.data)); } catch { setText(""); } }
     if (!pdf || !desktop) return;
     const u = URL.createObjectURL(dataUrlToBlob(file.data));
@@ -46,11 +47,12 @@ function FileCard({ meta, file }) {
     <div className="panel">
       <b style={{ wordBreak: "break-all" }}>{meta.name} <span className="tag">{kbText(meta.size)}</span></b>
       {!file && <div className="tag" style={{ textTransform: "none" }}>Loading file… (needs internet the first time)</div>}
-      {file && img && <img className="bigimg" src={file.data} alt={meta.name} />}
-      {file && pdf && url && <object className="pdfview" data={url} type="application/pdf"><p style={{ padding: 12, color: "#000" }}>Preview is not available here. Use Open or Download.</p></object>}
-      {file && pdf && !desktop && <div className="tag" style={{ textTransform: "none" }}>PDF saved. Tap Open to read it, or Download to keep it.</div>}
-      {file && txt && <div className="val">{text.slice(0, 20000)}{text.length > 20000 ? "\n\n… Showing the first 20,000 letters. Use Copy or Download for all." : ""}</div>}
-      {file && (
+      {empty && <div className="err" role="alert">This saved file is empty (0 bytes), so it cannot be opened. Press <b>Edit</b>, remove it, and upload the file again.</div>}
+      {file && !empty && img && <img className="bigimg" src={file.data} alt={meta.name} />}
+      {file && !empty && pdf && url && <object className="pdfview" data={url} type="application/pdf"><p style={{ padding: 12, color: "#000" }}>Preview is not available here. Use Open or Download.</p></object>}
+      {file && !empty && pdf && !desktop && <div className="tag" style={{ textTransform: "none" }}>PDF saved. Tap Open to read it, or Download to keep it.</div>}
+      {file && !empty && txt && <div className="val">{text.slice(0, 20000)}{text.length > 20000 ? "\n\n… Showing the first 20,000 letters. Use Copy or Download for all." : ""}</div>}
+      {file && !empty && (
         <FileActions name={meta.name} dataUrl={file.data}>
           {txt && <button className="btn" onClick={async () => { setCopied((await copyText(text)) ? "Copied" : "Copy failed"); setTimeout(() => setCopied(""), 1500); }}>{copied || "Copy"}</button>}
         </FileActions>

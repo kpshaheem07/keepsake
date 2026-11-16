@@ -71,7 +71,11 @@ export async function prepareFile(file) {
   if (isPdf || isTxt) {
     if (file.size > MAX_FILE) throw new Error(`"${file.name}" is too big (${kb} KB). The limit is 740 KB.`);
     const type = isPdf ? "application/pdf" : "text/plain";
+    if (file.size === 0) throw new Error(`"${file.name}" is empty (0 bytes). If it is in Google Drive or Photos, save it to your phone first, then choose it again.`);
     const data = (await readDataUrl(file)).replace(/^data:[^;,]*/, "data:" + type);
+    const payload = data.split(",")[1] || "";
+    const got = Math.round(payload.length * 0.75) - (payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0);
+    if (!payload || Math.abs(got - file.size) > 2) throw new Error(`"${file.name}" could not be read completely. Please try again, or save the file to your phone first.`);
     return { name: file.name, type, size: file.size, data };
   }
   if (!file.type.startsWith("image/")) throw new Error(`"${file.name}" is not a PDF, TXT or image file.`);
@@ -110,8 +114,13 @@ export function canShareFiles() {
   catch { return false; }
 }
 // Opens the phone's own share menu ("Save to Files", "Drive", ...).
+export const isEmptyData = (u) => !u || !(u.split(",")[1] || "");
+function realBlob(dataUrl) {
+  if (isEmptyData(dataUrl)) throw new Error("This saved file is empty (0 bytes). Press Edit, remove it, and upload it again.");
+  return dataUrlToBlob(dataUrl);
+}
 export async function shareFile(name, dataUrl) {
-  const blob = dataUrlToBlob(dataUrl);
+  const blob = realBlob(dataUrl);
   const f = new File([blob], name, { type: blob.type });
   try { await navigator.share({ files: [f], title: name }); return "shared"; }
   catch (e) { return e && e.name === "AbortError" ? "cancelled" : "failed"; }
@@ -122,7 +131,7 @@ export async function saveFile(name, dataUrl) {
     const r = await shareFile(name, dataUrl);
     if (r !== "failed") return r;
   }
-  const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
+  const url = URL.createObjectURL(realBlob(dataUrl));
   const a = document.createElement("a");
   a.href = url; a.download = name; a.style.display = "none";
   document.body.append(a); a.click();
@@ -131,7 +140,7 @@ export async function saveFile(name, dataUrl) {
 }
 // Opens the file in a new tab. If the phone blocks that, opens it in this tab (use Back to return).
 export function openFile(dataUrl) {
-  const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
+  const url = URL.createObjectURL(realBlob(dataUrl));
   const w = window.open(url, "_blank");
   if (!w) location.href = url;
   setTimeout(() => URL.revokeObjectURL(url), 300000);

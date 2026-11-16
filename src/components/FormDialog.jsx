@@ -14,11 +14,14 @@ export default function FormDialog({ title, fields, initial = {}, onSave, onClos
     try { setF({ ...f, image: await resizeImage(file) }); setErr(""); } catch (x) { setErr(x.message); }
   };
   const pickFiles = (key) => async (e) => {
-    const picked = [...e.target.files]; e.target.value = "";
+    const picked = [...e.target.files];
+    // Start reading every file NOW. Some phones lose the file if the picker is cleared first.
+    const jobs = picked.map((file) => prepareFile(file).then((r) => ({ r }), (x) => ({ x })));
+    e.target.value = "";
     const cur = [...f[key]], errs = [];
-    for (const file of picked) {
+    for (const j of await Promise.all(jobs)) {
       if (cur.length >= MAX_FILES) { errs.push(`You can add up to ${MAX_FILES} files.`); break; }
-      try { cur.push({ id: uid(), ...(await prepareFile(file)) }); } catch (x) { errs.push(x.message); }
+      if (j.x) errs.push(j.x.message); else cur.push({ id: uid(), ...j.r });
     }
     setF((p) => ({ ...p, [key]: cur })); setErr(errs.join(" "));
   };
