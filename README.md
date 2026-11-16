@@ -18,6 +18,7 @@ Vercel updates the website by itself in about 2 minutes.
 - Sign in with the email and password you made in Firebase > Authentication > Users.
 - Home: + Add category. Open one: + Add category again. Open one: numbered list, + Add.
 - Click a heading for the big page with Copy buttons.
+- Export PDF opens a preview. Press Save as PDF (one tap), then choose Save as PDF (Android) or Share > Save to Files (iPhone). Inside WhatsApp/Instagram/Facebook browsers printing and downloads are blocked: use Open in browser.
 - Export PDF (categories only; Projects, Certificates and the Private lock are not included): on Home (everything or one category) or inside a category.
   Passwords are left out unless you tick "Include passwords". The Private lock is never exported.
 - Download / Open / Share: Download saves the file on desktop and Android. On iPhone and iPad it opens the share menu (choose Save to Files). Open shows the file in a new tab. Android also has a Share button.

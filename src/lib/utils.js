@@ -136,3 +136,9 @@ export function openFile(dataUrl) {
   if (!w) location.href = url;
   setTimeout(() => URL.revokeObjectURL(url), 300000);
 }
+
+// Browsers inside other apps (WhatsApp, Instagram, Facebook...) often block downloads and printing.
+export function inAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|Instagram|MicroMessenger|Snapchat|TikTok|LinkedInApp|Line\/|GSA\//i.test(ua) || (/Android/.test(ua) && /; wv\)/.test(ua));
+}

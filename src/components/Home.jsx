@@ -4,6 +4,7 @@
 import BlackHole from "@/components/BlackHoleFallback";
 import NameList from "./NameList.jsx";
 import Lock from "./Lock.jsx";
+import { APP_VERSION } from "@/version";
 
 export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, onExport, onProjects, onCerts, notice }) {
   return (
@@ -25,6 +26,7 @@ export default function Home({ rows, onAdd, onOpen, onEdit, onDelete, onLock, on
           <button className="btn" onClick={onExport}>Export PDF</button>
           <button className="btn" onClick={onLock}><Lock /> Private lock</button>
         </div>
+        <div className="tag" style={{ textTransform: "none", width: "100%", textAlign: "center", marginTop: 14 }}>Version {APP_VERSION}</div>
       </div>
     </>
   );

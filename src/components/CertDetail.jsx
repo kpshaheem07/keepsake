@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { dataUrlToBlob, fmt } from "@/lib/utils";
-import Attachments, { FileActions } from "./Attachments.jsx";
+import Attachments, { FileActions, InAppNotice } from "./Attachments.jsx";
 
 export default function CertDetail({ uid, cert, onBack, onEdit, onDelete }) {
   const [blob, setBlob] = useState("");
@@ -21,6 +21,7 @@ export default function CertDetail({ uid, cert, onBack, onEdit, onDelete }) {
       {cert.file && !img && blob && desktop && (
         <object className="pdfview" data={blob} type="application/pdf"><p style={{ padding: 12, color: "#000" }}>Preview is not available here. Use Open or Download.</p></object>
       )}
+      {cert.file && <InAppNotice />}
       {cert.file && <FileActions name={cert.fileName || "certificate"} dataUrl={cert.file} />}
       <Attachments uid={uid} item={cert} />
       {!cert.file && !(cert.fileMeta || []).length && <div className="empty" style={{ margin: "12px 0" }}>No file saved. Press Edit to add one.</div>}

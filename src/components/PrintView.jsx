@@ -1,9 +1,18 @@
-import { byCreated, fmt } from "@/lib/utils";
+import { useState } from "react";
+import { byCreated, fmt, inAppBrowser } from "@/lib/utils";
 
-export default function PrintView({ S, scope, includePw }) {
+export default function PrintView({ S, scope, includePw, onClose }) {
+  const [msg, setMsg] = useState("");
   const cats = S.cats.filter((c) => scope === "all" || c.id === scope).sort(byCreated);
   return (
-    <div id="print-root">
+    <div id="print-root" className="preview">
+      <div className="no-print preview-bar">
+        <button className="btn y" onClick={() => { try { if (typeof window.print !== "function") throw new Error("printing is not available"); window.print(); } catch (e) { setMsg("Could not open the print window: " + (e?.message || e)); } }}>Save as PDF</button>
+        <button className="btn" onClick={onClose}>Close</button>
+        <div className="tag" style={{ textTransform: "none", flexBasis: "100%" }}>Press <b>Save as PDF</b>. Then in the window that opens: on Android choose <b>Save as PDF</b> and press the PDF button. On iPhone press the Share icon and choose <b>Save to Files</b>.</div>
+        {inAppBrowser() && <div className="banner" style={{ background: "var(--acc)", flexBasis: "100%" }}>You are inside another app. Printing can be blocked here. Tap the menu (three dots) and choose <b>Open in browser</b>.</div>}
+        {msg && <div className="err" role="alert" style={{ flexBasis: "100%" }}>{msg}</div>}
+      </div>
       <h1>Keepsake</h1>
       <p>{scope === "all" ? "Everything" : cats[0]?.name} · {fmt(new Date())}</p>
       {cats.map((c) => (

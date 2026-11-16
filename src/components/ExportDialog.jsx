@@ -18,7 +18,7 @@ export default function ExportDialog({ cats, fixedId, onGo, onClose }) {
         <input type="checkbox" style={{ width: 24, height: 24 }} checked={pw} onChange={(e) => setPw(e.target.checked)} /> Include passwords
       </label>
       {pw && <div className="err">Warning: a PDF is not locked. Anyone who gets the file can read these passwords.</div>}
-      <p style={{ color: "var(--mute)", fontSize: 14 }}>The Private lock is never included. In the next window, choose <b>Save as PDF</b>.</p>
+      <p style={{ color: "var(--mute)", fontSize: 14 }}>The Private lock is never included. A preview opens. Then press <b>Save as PDF</b>.</p>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn y" onClick={() => onGo(scope, pw)}>Make PDF</button>
         <button className="btn" onClick={onClose}>Cancel</button>

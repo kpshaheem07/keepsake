@@ -1,21 +1,29 @@
 import { useEffect, useState } from "react";
 import { useFiles } from "@/useCloud";
-import { dataUrlToBlob, dataUrlToText, kbText, copyText, saveFile, shareFile, openFile, canShareFiles, isIOS } from "@/lib/utils";
+import { dataUrlToBlob, dataUrlToText, kbText, copyText, saveFile, shareFile, openFile, canShareFiles, isIOS, inAppBrowser } from "@/lib/utils";
+
+// Download / Share / Open buttons that work on desktop, Android and iPhone.
+export function InAppNotice() {
+  if (!inAppBrowser()) return null;
+  return <div className="banner" style={{ background: "var(--acc)" }} role="status">You are inside another app. Downloads can be blocked here. Tap the menu (three dots) and choose <b>Open in browser</b> (Chrome or Safari).</div>;
+}
 
 // Download / Share / Open buttons that work on desktop, Android and iPhone.
 export function FileActions({ name, dataUrl, children }) {
   const [msg, setMsg] = useState("");
   const showShare = canShareFiles() && !isIOS();
+  const run = (fn) => async () => { try { await fn(); } catch (e) { setMsg("This did not work: " + (e?.message || e) + ". Try the other buttons."); } };
   return (
     <>
       <div className="row">
         {children}
-        <button className="btn y" onClick={async () => {
+        <button className="btn y" onClick={run(async () => {
+          setMsg("Working…");
           const r = await saveFile(name, dataUrl);
           setMsg(r === "downloaded" ? "Download started. Look in your Downloads folder. If nothing appears, tap Share or Open." : r === "shared" ? "In the menu, choose Save to Files." : "");
-        }}>Download</button>
-        {showShare && <button className="btn" onClick={async () => { if ((await shareFile(name, dataUrl)) === "failed") setMsg("Share did not work on this device. Try Open."); }}>Share</button>}
-        <button className="btn" onClick={() => openFile(dataUrl)}>Open</button>
+        })}>Download</button>
+        {showShare && <button className="btn" onClick={run(async () => { if ((await shareFile(name, dataUrl)) === "failed") setMsg("Share did not work on this device. Try Open."); })}>Share</button>}
+        <button className="btn" onClick={run(async () => { openFile(dataUrl); setMsg("Opening… If nothing opens, your browser blocked it. Allow pop-ups for this site, or use Download."); })}>Open</button>
       </div>
       {msg && <div className="tag" role="status" style={{ textTransform: "none" }}>{msg}</div>}
     </>
@@ -58,6 +66,7 @@ export default function Attachments({ uid, item }) {
   return (
     <section>
       <div className="tag" style={{ margin: "8px 0" }}>Files ({metas.length})</div>
+      <InAppNotice />
       {err && <div className="err" role="alert">{err}</div>}
       {metas.map((m) => <FileCard key={m.id} meta={m} file={files[m.id]} />)}
     </section>

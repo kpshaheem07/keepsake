@@ -60,15 +60,6 @@ export default function App({ user }) {
     setMigrated(true); notify("Moved to the cloud");
   };
 
-  // Print: show the print page, then open the print window (choose "Save as PDF").
-  useEffect(() => {
-    if (!job) return;
-    const done = () => setJob(null);
-    addEventListener("afterprint", done);
-    const t = setTimeout(() => window.print(), 400);
-    return () => { clearTimeout(t); removeEventListener("afterprint", done); };
-  }, [job]);
-
   const withFiles = (row) => ({ ...row, files: [...(row.fileMeta || []), ...(row.file ? [{ id: "legacy", name: row.fileName || "certificate", type: row.fileType || "application/pdf", size: 0, data: row.file }] : [])] });
   const subText = (t, r) => [t, fileCount([r]) ? `${fileCount([r])} file${fileCount([r]) === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
   const delMsg = (t, r) => { const n = fileCount([r]); return `Delete "${t}"${n ? ` and its ${n} file${n === 1 ? "" : "s"}` : ""}?`; };
@@ -230,6 +221,6 @@ export default function App({ user }) {
         onSave={async (vals) => { if (await dlg.cb(vals)) { setDlg(null); notify("Saved"); } else return "Could not save. Nothing was changed."; }} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
-    {job && <PrintView S={S} scope={job.scope} includePw={job.pw} />}
+    {job && <PrintView S={S} scope={job.scope} includePw={job.pw} onClose={() => setJob(null)} />}
   </>);
 }
